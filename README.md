@@ -62,6 +62,10 @@ Outputs (in `Raportit/Sumup/<KuukausiFI>/`):
 - `myyntiraportti-cleaned-summary-<month>.csv` — aggregated by product,
   split into Card/Non-cash and Käteinen (cash) sections
 
+At the end of the run it also prints gross revenue, total SumUp fees
+(tilityspalkkiot), and net revenue for the month — summed from each
+transaction's `PAYOUT` event fee.
+
 Product names come from SumUp's `product_summary` field. SumUp's REST API
 does not expose the merchant's product catalog/categories at all (confirmed
 against the official OpenAPI spec — only the dashboard CSV export has them),

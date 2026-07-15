@@ -145,6 +145,15 @@ def fetch_transaction_detail(token: str, tx_id: str) -> dict:
 # Data transformation
 # ---------------------------------------------------------------------------
 
+def extract_fee(detail: dict) -> float:
+    """SumUp's fee for a transaction, summed from its PAYOUT event(s)."""
+    return sum(
+        float(e.get("fee_amount", 0) or 0)
+        for e in detail.get("events", [])
+        if e.get("type") == "PAYOUT"
+    )
+
+
 def _product_category(product: dict) -> str:
     cat = product.get("category")
     if isinstance(cat, dict):
@@ -154,15 +163,17 @@ def _product_category(product: dict) -> str:
     return ""
 
 
-def build_myyntiraportti_rows(transactions: list[dict], token: str) -> list[dict]:
+def build_myyntiraportti_rows(transactions: list[dict], token: str) -> tuple[list[dict], float]:
     """
     Convert API transactions into rows that match the Finnish myyntiraportti
     CSV schema expected by generate_clean_sales_report().
 
-    Fetches full transaction detail for any transaction that lacks products.
+    Fetches full transaction detail for any transaction that lacks products
+    (also the source of each transaction's SumUp fee). Returns (rows, total_fees).
     """
     rows: list[dict] = []
     total = len(transactions)
+    total_fees = 0.0
     category_lookup = load_category_lookup()
 
     for i, tx in enumerate(transactions, 1):
@@ -177,6 +188,7 @@ def build_myyntiraportti_rows(transactions: list[dict], token: str) -> list[dict
             try:
                 detail = fetch_transaction_detail(token, tx["id"])
                 products = detail.get("products") or []
+                total_fees += extract_fee(detail)
             except Exception:
                 pass
 
@@ -208,7 +220,7 @@ def build_myyntiraportti_rows(transactions: list[dict], token: str) -> list[dict
         if i % 20 == 0 or i == total:
             print(f"  processed {i}/{total} transactions")
 
-    return rows
+    return rows, total_fees
 
 
 # ---------------------------------------------------------------------------
@@ -266,7 +278,7 @@ def main() -> None:
     # Build raw myyntiraportti CSV (same schema as manual SumUp export)
     myynti_path = out_dir / f"myyntiraportti-{start.strftime('%Y-%m-%d')}_{end.strftime('%Y-%m-%d')}.csv"
     print("Building myyntiraportti rows ...")
-    rows = build_myyntiraportti_rows(transactions, token)
+    rows, total_fees = build_myyntiraportti_rows(transactions, token)
     pd.DataFrame(rows).to_csv(myynti_path, index=False)
     print(f"Saved: {myynti_path}\n")
 
@@ -274,7 +286,12 @@ def main() -> None:
     cleaned_path = out_dir / f"myyntiraportti-cleaned-summary-{month_name_fi}.csv"
     generate_clean_sales_report(myynti_path, cleaned_path)
 
+    gross = sum(float(tx.get("amount", 0)) for tx in transactions)
     print("\n" + "=" * 70)
+    print(f"Gross revenue:            EUR {gross:.2f}")
+    print(f"Total fees (tilityspalkkiot): EUR {total_fees:.2f}")
+    print(f"Net revenue:               EUR {gross - total_fees:.2f}")
+    print("=" * 70)
     print("Done.")
     print("=" * 70)
 
