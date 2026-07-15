@@ -108,44 +108,55 @@ def fetch_balance_transactions(payout_id: str) -> list:
     )
 
 
+def _get(obj, key, default=None):
+    """
+    dict-style .get() that works for both plain dicts and Stripe SDK objects
+    (StripeObject no longer subclasses dict / supports .get() as of stripe>=11).
+    """
+    try:
+        return obj[key]
+    except (KeyError, TypeError):
+        return default
+
+
 def resolve_description(bt) -> str:
     """
     Try to extract a meaningful item description from a balance transaction.
     Cascade: description field → charge description → checkout line items.
     """
-    desc = (bt.get("description") or "").strip()
+    desc = (_get(bt, "description") or "").strip()
     if desc and desc.lower() != "stripe fee":
         return desc
 
-    source_id = bt.get("source")
+    source_id = _get(bt, "source")
     if not source_id or not isinstance(source_id, str):
-        return desc or bt.get("id", "")
+        return desc or _get(bt, "id", "")
 
     # Fetch the charge object for richer description / checkout line items
     if source_id.startswith("ch_") or source_id.startswith("py_"):
         try:
             charge = stripe.Charge.retrieve(source_id, expand=["payment_intent"])
-            charge_desc = (charge.get("description") or "").strip()
+            charge_desc = (_get(charge, "description") or "").strip()
 
             # Attempt checkout session line items
-            pi = charge.get("payment_intent")
+            pi = _get(charge, "payment_intent")
             if isinstance(pi, dict):
-                pi_id = pi.get("id", "")
+                pi_id = _get(pi, "id", "")
             else:
                 pi_id = pi or ""
 
             if pi_id:
                 sessions = stripe.checkout.Session.list(payment_intent=pi_id, limit=1)
-                session_list = sessions.get("data", [])
+                session_list = _get(sessions, "data", [])
                 if session_list:
                     session = session_list[0]
                     line_items = stripe.checkout.Session.list_line_items(
                         session["id"], limit=100
                     )
                     names = [
-                        li["description"] or (li.get("price", {}) or {}).get("nickname", "")
-                        for li in line_items.get("data", [])
-                        if li.get("description") or (li.get("price", {}) or {}).get("nickname")
+                        _get(li, "description") or _get(_get(li, "price", {}) or {}, "nickname", "")
+                        for li in _get(line_items, "data", [])
+                        if _get(li, "description") or _get(_get(li, "price", {}) or {}, "nickname")
                     ]
                     if names:
                         return "; ".join(names)
