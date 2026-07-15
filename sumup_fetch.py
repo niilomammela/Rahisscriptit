@@ -169,12 +169,14 @@ def build_myyntiraportti_rows(transactions: list[dict], token: str) -> list[dict
                     "Hinta (brutto)": product.get("total_price", amount),
                 })
         else:
-            # No product detail available — use transaction-level data
+            # No itemized product detail available — fall back to the
+            # transaction's product_summary (human-readable name set at
+            # checkout), not the opaque transaction_code/id.
             rows.append({
                 "Tyyppi": tx_type,
                 "Maksutapa": maksutapa,
                 "Määrä": 1,
-                "Kuvaus": tx.get("transaction_code") or tx.get("id") or "Unknown",
+                "Kuvaus": tx.get("product_summary") or tx.get("transaction_code") or tx.get("id") or "Unknown",
                 "Kategoria": "Uncategorized",
                 "Hinta (brutto)": amount,
             })
