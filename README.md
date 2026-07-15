@@ -61,9 +61,13 @@ Outputs:
 - `myyntiraportti-cleaned-summary-<month>.csv` — aggregated by product,
   split into Card/Non-cash and Käteinen (cash) sections
 
-Product names come from SumUp's `product_summary` field. Category is not
-exposed by this account's API data, so all products show as "Uncategorized"
-— this is a SumUp data limitation, not a script bug.
+Product names come from SumUp's `product_summary` field. SumUp's REST API
+does not expose the merchant's product catalog/categories at all (confirmed
+against the official OpenAPI spec — only the dashboard CSV export has them),
+so categories are resolved from a local lookup file, `sumup_categories.json`
+(product name → category). Any product not yet in that file falls back to
+"Uncategorized" — when a new product type appears, add it to
+`sumup_categories.json` and it'll be categorized correctly from then on.
 
 ### `stripe_fetch.py`
 Finds payouts that **arrived** in the given month, then fetches every balance
