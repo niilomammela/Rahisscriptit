@@ -254,6 +254,17 @@ def build_item_summary(transaction_rows: list[dict]) -> list[dict]:
 # Main
 # ---------------------------------------------------------------------------
 
+def parse_month(s: str) -> tuple[int, int]:
+    """Accepts 'M/YYYY', 'MM/YYYY' (e.g. 4/2026) or 'YYYY-MM' (e.g. 2026-04)."""
+    for fmt in ("%m/%Y", "%Y-%m"):
+        try:
+            dt = datetime.strptime(s, fmt)
+            return dt.year, dt.month
+        except ValueError:
+            continue
+    sys.exit(f"Error: month must be M/YYYY (e.g. 4/2026) or YYYY-MM (e.g. 2026-04), got {s!r}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
@@ -261,19 +272,14 @@ def main() -> None:
             "transaction + item summary CSVs."
         )
     )
-    parser.add_argument("month", help="Month in YYYY-MM format, e.g. 2026-03")
+    parser.add_argument("month", help="Month as M/YYYY (e.g. 4/2026) or YYYY-MM (e.g. 2026-04)")
     parser.add_argument(
         "--output-dir",
         help="Directory for output files (default: Raportit/Stripe/<MonthFI>/)",
     )
     args = parser.parse_args()
 
-    try:
-        dt = datetime.strptime(args.month, "%Y-%m")
-    except ValueError:
-        sys.exit("Error: month must be YYYY-MM format, e.g. 2026-03")
-
-    year, month = dt.year, dt.month
+    year, month = parse_month(args.month)
     month_name_fi = MONTH_NAMES_FI[month]
     month_str = f"{year}-{month:02d}"
 

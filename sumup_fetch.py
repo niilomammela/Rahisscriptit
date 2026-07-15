@@ -86,7 +86,8 @@ def fetch_transactions(token: str, start: datetime, end: datetime) -> list[dict]
         "limit": 100,
         "statuses[]": ["SUCCESSFUL", "REFUNDED"],
     }
-    url = f"{API_BASE}/v0.1/me/transactions/history"
+    history_endpoint = f"{API_BASE}/v0.1/me/transactions/history"
+    url = history_endpoint
     transactions: list[dict] = []
 
     while url:
@@ -97,11 +98,14 @@ def fetch_transactions(token: str, start: datetime, end: datetime) -> list[dict]
         transactions.extend(batch)
         print(f"  fetched {len(batch)} transactions (running total: {len(transactions)})")
 
-        next_url = next(
+        next_href = next(
             (link["href"] for link in data.get("links", []) if link.get("rel") == "next"),
             None,
         )
-        url = next_url
+        if next_href and not next_href.startswith("http"):
+            # SumUp returns just the query string for "next", not a full URL
+            next_href = f"{history_endpoint}?{next_href}"
+        url = next_href
         params = {}  # next URL already encodes all params
 
     return transactions
@@ -191,23 +195,29 @@ def build_myyntiraportti_rows(transactions: list[dict], token: str) -> list[dict
 # Main
 # ---------------------------------------------------------------------------
 
+def parse_month(s: str) -> tuple[int, int]:
+    """Accepts 'M/YYYY', 'MM/YYYY' (e.g. 4/2026) or 'YYYY-MM' (e.g. 2026-04)."""
+    for fmt in ("%m/%Y", "%Y-%m"):
+        try:
+            dt = datetime.strptime(s, fmt)
+            return dt.year, dt.month
+        except ValueError:
+            continue
+    sys.exit(f"Error: month must be M/YYYY (e.g. 4/2026) or YYYY-MM (e.g. 2026-04), got {s!r}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Fetch SumUp transactions for a month and produce report CSVs"
     )
-    parser.add_argument("month", help="Month in YYYY-MM format, e.g. 2026-03")
+    parser.add_argument("month", help="Month as M/YYYY (e.g. 4/2026) or YYYY-MM (e.g. 2026-04)")
     parser.add_argument(
         "--output-dir",
         help="Directory for output files (default: Raportit/<MonthFI>/)",
     )
     args = parser.parse_args()
 
-    try:
-        dt = datetime.strptime(args.month, "%Y-%m")
-    except ValueError:
-        sys.exit("Error: month must be YYYY-MM format, e.g. 2026-03")
-
-    year, month = dt.year, dt.month
+    year, month = parse_month(args.month)
     last_day = calendar.monthrange(year, month)[1]
     start = datetime(year, month, 1, tzinfo=timezone.utc)
     end = datetime(year, month, last_day, tzinfo=timezone.utc)
