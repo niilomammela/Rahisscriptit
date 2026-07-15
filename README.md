@@ -48,15 +48,16 @@ python sumup_fetch.py 4/2026
 python stripe_fetch.py 4/2026
 ```
 
-Both write their output into `Raportit/<KuukausiFI>/` by default (e.g.
-`Raportit/Huhtikuu/`), or pass `--output-dir <path>` to override.
+Each writes into its own provider subfolder under `Raportit/<Provider>/<KuukausiFI>/`
+by default (e.g. `Raportit/Sumup/Huhtikuu/`, `Raportit/Stripe/Huhtikuu/`), or
+pass `--output-dir <path>` to override.
 
 ### `sumup_fetch.py`
 Fetches all transactions in the month via SumUp's transaction history API,
 maps them to the same schema as a manual `myyntiraportti` export, then runs
 the same cleaning/aggregation as `myyntiraportti_summary.py`.
 
-Outputs:
+Outputs (in `Raportit/Sumup/<KuukausiFI>/`):
 - `myyntiraportti-<start>_<end>.csv` — raw rows, one per line item
 - `myyntiraportti-cleaned-summary-<month>.csv` — aggregated by product,
   split into Card/Non-cash and Käteinen (cash) sections

@@ -3,13 +3,13 @@
 Fetch SumUp transaction data for a given month via the SumUp API and produce
 the same CSV reports as the manual CSV-export workflow.
 
-Outputs (saved to --output-dir, or Raportit/<MonthFI>/ by default):
+Outputs (saved to --output-dir, or Raportit/Sumup/<MonthFI>/ by default):
   myyntiraportti-<start>_<end>.csv          raw sales rows (same schema as manual export)
   myyntiraportti-cleaned-summary-<month>.csv  product summary by category
 
 Usage:
     python sumup_fetch.py 2026-03
-    python sumup_fetch.py 2026-03 --output-dir Raportit/Maaliskuu/
+    python sumup_fetch.py 2026-03 --output-dir Raportit/Sumup/Maaliskuu/
 
 Auth — set one of the following in .env or as environment variables:
     SUMUP_ACCESS_TOKEN                         personal access token (simplest)
@@ -233,7 +233,7 @@ def main() -> None:
     parser.add_argument("month", help="Month as M/YYYY (e.g. 4/2026) or YYYY-MM (e.g. 2026-04)")
     parser.add_argument(
         "--output-dir",
-        help="Directory for output files (default: Raportit/<MonthFI>/)",
+        help="Directory for output files (default: Raportit/Sumup/<MonthFI>/)",
     )
     args = parser.parse_args()
 
@@ -246,7 +246,7 @@ def main() -> None:
     if args.output_dir:
         out_dir = Path(args.output_dir)
     else:
-        out_dir = Path(__file__).parent / "Raportit" / month_name_fi.capitalize()
+        out_dir = Path(__file__).parent / "Raportit" / "Sumup" / month_name_fi.capitalize()
     out_dir.mkdir(parents=True, exist_ok=True)
 
     print("=" * 70)
