@@ -18,6 +18,7 @@ Auth — set one of the following in .env or as environment variables:
 
 import argparse
 import calendar
+import json
 import os
 import sys
 from datetime import datetime, timezone
@@ -35,12 +36,28 @@ except ImportError:
 from process_payments import generate_clean_sales_report
 
 API_BASE = "https://api.sumup.com"
+CATEGORIES_FILE = Path(__file__).parent / "sumup_categories.json"
 
 MONTH_NAMES_FI = {
     1: "tammikuu", 2: "helmikuu", 3: "maaliskuu", 4: "huhtikuu",
     5: "toukokuu", 6: "kesäkuu", 7: "heinäkuu", 8: "elokuu",
     9: "syyskuu", 10: "lokakuu", 11: "marraskuu", 12: "joulukuu",
 }
+
+
+def load_category_lookup() -> dict[str, str]:
+    """
+    Product name -> category, loaded from sumup_categories.json.
+    The SumUp REST API doesn't expose the merchant's product catalog
+    (categories only exist in the dashboard CSV export), so known mappings
+    are maintained locally instead. Unknown products fall back to
+    "Uncategorized".
+    """
+    if not CATEGORIES_FILE.exists():
+        return {}
+    with open(CATEGORIES_FILE, encoding="utf-8") as f:
+        data = json.load(f)
+    return {k: v for k, v in data.items() if not k.startswith("_")}
 
 
 # ---------------------------------------------------------------------------
@@ -146,6 +163,7 @@ def build_myyntiraportti_rows(transactions: list[dict], token: str) -> list[dict
     """
     rows: list[dict] = []
     total = len(transactions)
+    category_lookup = load_category_lookup()
 
     for i, tx in enumerate(transactions, 1):
         status = (tx.get("status") or "").upper()
@@ -164,24 +182,26 @@ def build_myyntiraportti_rows(transactions: list[dict], token: str) -> list[dict
 
         if products:
             for product in products:
+                name = product.get("name", "Unknown")
                 rows.append({
                     "Tyyppi": tx_type,
                     "Maksutapa": maksutapa,
                     "Määrä": product.get("quantity", 1),
-                    "Kuvaus": product.get("name", "Unknown"),
-                    "Kategoria": _product_category(product) or "Uncategorized",
+                    "Kuvaus": name,
+                    "Kategoria": _product_category(product) or category_lookup.get(name, "Uncategorized"),
                     "Hinta (brutto)": product.get("total_price", amount),
                 })
         else:
             # No itemized product detail available — fall back to the
             # transaction's product_summary (human-readable name set at
             # checkout), not the opaque transaction_code/id.
+            name = tx.get("product_summary") or tx.get("transaction_code") or tx.get("id") or "Unknown"
             rows.append({
                 "Tyyppi": tx_type,
                 "Maksutapa": maksutapa,
                 "Määrä": 1,
-                "Kuvaus": tx.get("product_summary") or tx.get("transaction_code") or tx.get("id") or "Unknown",
-                "Kategoria": "Uncategorized",
+                "Kuvaus": name,
+                "Kategoria": category_lookup.get(name, "Uncategorized"),
                 "Hinta (brutto)": amount,
             })
 
