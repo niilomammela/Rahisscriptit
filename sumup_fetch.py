@@ -284,7 +284,7 @@ def main() -> None:
 
     # Produce cleaned summary using the existing analysis function
     cleaned_path = out_dir / f"myyntiraportti-cleaned-summary-{month_name_fi}.csv"
-    generate_clean_sales_report(myynti_path, cleaned_path)
+    generate_clean_sales_report(myynti_path, cleaned_path, total_fees=total_fees)
 
     gross = sum(float(tx.get("amount", 0)) for tx in transactions)
     print("\n" + "=" * 70)

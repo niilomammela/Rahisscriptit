@@ -69,10 +69,13 @@ def format_quantity(value):
     return f"{as_float:.2f}"
 
 
-def generate_clean_sales_report(input_path, output_path):
+def generate_clean_sales_report(input_path, output_path, total_fees=None):
     """
     Create a cleaned product sales report from myyntiraportti CSV.
     Output contains card/non-cash rows first and Käteinen rows in a separate section.
+
+    If total_fees is given (e.g. from sumup_fetch.py, which can read fees off
+    the SumUp API), a FEES section with gross/fees/net revenue is appended.
     """
     print("\n" + "=" * 80)
     print("CLEAN SALES REPORT (myyntiraportti)")
@@ -254,6 +257,44 @@ def generate_clean_sales_report(input_path, output_path):
             "Total Sold": f"{card_category_summary['total_sold'].sum():.2f}",
         }
     )
+
+    if total_fees is not None:
+        gross_revenue = card_rows["total_sold"].sum() + cash_rows["total_sold"].sum()
+        output_rows.append(
+            {
+                "Section": "",
+                "Category": "",
+                "Product": "",
+                "Quantity Sold": "",
+                "Unit Price": "",
+                "Total Sold": "",
+            }
+        )
+        output_rows.append(
+            {
+                "Section": "=== FEES ===",
+                "Category": "",
+                "Product": "",
+                "Quantity Sold": "",
+                "Unit Price": "",
+                "Total Sold": "",
+            }
+        )
+        for label, value in (
+            ("Gross revenue", gross_revenue),
+            ("Total fees (tilityspalkkiot)", total_fees),
+            ("Net revenue", gross_revenue - total_fees),
+        ):
+            output_rows.append(
+                {
+                    "Section": "Fees",
+                    "Category": "",
+                    "Product": label,
+                    "Quantity Sold": "",
+                    "Unit Price": "",
+                    "Total Sold": f"{value:.2f}",
+                }
+            )
 
     output_df = pd.DataFrame(output_rows, columns=output_cols)
     output_df.to_csv(output_path, index=False)
